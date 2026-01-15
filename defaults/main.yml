@@ -1,0 +1,5 @@
+qmanager_install_source_dir: https://sapphirefilerepo.blob.core.windows.net/public
+qmanager_install_source_file: PrintManagementInstall.exe
+qmanager_groups: "EPS"
+qmanager_host: "qmanager.{{ (inventory_hostname | split('.'))[1:] | join('.') }}"
+qmanager_port: 3034
