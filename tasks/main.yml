@@ -4,43 +4,49 @@
     suffix: qmanager
   register: qmanager_temp_install_dir
 
-- name: Copy HTTP install file
-  ansible.windows.win_get_url:
-    url: "{{ qmanager_install_source_dir }}/{{ qmanager_install_source_file }}"
-    dest: "{{ qmanager_temp_install_dir.path }}/{{ qmanager_install_source_file }}"
-    force: false
-  when: qmanager_install_source_dir is ansible.builtin.uri(schemes=['http', 'https'])
+- name: Download and Install qManager Websocket Agent
+  block:
+    - name: Copy HTTP install file
+      ansible.windows.win_get_url:
+        url: "{{ qmanager_install_source_dir }}/{{ qmanager_install_source_file }}"
+        dest: "{{ qmanager_temp_install_dir.path }}/{{ qmanager_install_source_file }}"
+        force: false
+      when: qmanager_install_source_dir is ansible.builtin.uri(schemes=['http', 'https'])
 
-- name: Copy install file from Ansible server
-  ansible.windows.win_copy:
-    src: "{{ playbook_dir }}/{{ qmanager_install_source_dir }}/{{ qmanager_install_source_file }}"
-    dest: "{{ qmanager_temp_install_dir.path }}/{{ qmanager_install_source_file }}"
-    force: false
-  when: qmanager_install_source_dir is not ansible.builtin.uri(schemes=['http', 'https'])
+    - name: Copy install file from Ansible server
+      ansible.windows.win_copy:
+        src: "{{ playbook_dir }}/{{ qmanager_install_source_dir }}/{{ qmanager_install_source_file }}"
+        dest: "{{ qmanager_temp_install_dir.path }}/{{ qmanager_install_source_file }}"
+        force: false
+      when: qmanager_install_source_dir is not ansible.builtin.uri(schemes=['http', 'https'])
 
-- name: Check if already installed
-  ansible.windows.win_stat:
-    path: "C:/Program Files/Sapphire Health/Print Management/unins000.exe"
-  register: uninstaller
+    - name: Check if already installed
+      ansible.windows.win_stat:
+        path: "C:/Program Files/Sapphire Health/Print Management/unins000.exe"
+      register: uninstaller
 
-- name: If uninstaller exists, uninstall previous version
-  ansible.windows.win_command:
-    cmd: '"C:/Program Files/Sapphire Health/Print Management/unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
-  when: uninstaller.stat.exists
+    - name: If uninstaller exists, uninstall previous version
+      ansible.windows.win_package:
+        path: "C:/Program Files/Sapphire Health/Print Management/unins000.exe"
+        arguments: >
+          /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+        wait_for_children: true
+      when: uninstaller.stat.exists
 
-- name: Install Application Silently using win_package
-  ansible.windows.win_package:
-    path: "{{ qmanager_temp_install_dir.path }}\\{{ qmanager_install_source_file }}"
-    arguments: >
-      /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-      /host={{ qmanager_host }}:{{ qmanager_port }}
-      /groups="{{ qmanager_groups }}"
-      /cert="qManager Websocket Agent"
-      # Key Inno Setup parameters
-    state: present
-  register: install_result
-
-- name: Delete temporary build directory
-  ansible.windows.win_file:
-    path: "{{ qmanager_temp_install_dir.path }}"
-    state: absent
+    - name: Install Application Silently using win_package
+      ansible.windows.win_package:
+        path: "{{ qmanager_temp_install_dir.path }}\\{{ qmanager_install_source_file }}"
+        arguments: >
+          /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+          /host={{ qmanager_host }}:{{ qmanager_port }}
+          /groups="{{ qmanager_groups }}"
+          /cert="qManager Websocket Agent"
+          # Key Inno Setup parameters
+        wait_for_children: true
+        state: present
+      register: install_result
+  always:
+    - name: Delete temporary build directory
+      ansible.windows.win_file:
+        path: "{{ qmanager_temp_install_dir.path }}"
+        state: absent
